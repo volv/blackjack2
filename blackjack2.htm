@@ -74,27 +74,22 @@ function shuffle(){
 
 //Returns score of given hand if >21 returns 0
 function scoreHand(hand){
-	let score =0;
+	let score = 0;
 	let aces = 0;
-	for(let i=0; i<hand.cards.length; i++){
-		let rank = (hand.cards[i].card%13) +1;
-		if(rank > 10){rank=10;}
-		if(rank ==1){
-			aces++;
-			rank = 11;
-		}
-		score += rank;
-	}
+	hand.cards.forEach(function(each) { 
+		let rank = (each.card % 13) + 1;
+		rank = (rank > 10) ? 10 : rank;
+		aces = (rank === 1) ? aces + 1 : aces;
+		score += (rank === 1) ? 11 : rank;
+	})
 
-	if(score>21){
-		if(aces==0){score = 0;}
-		while(aces>0&&score>21){
+	if(score > 21  && aces !== 0){
+		while(aces > 0 && score > 21){
 			aces--;
-			score -=10;
+			score -= 10;
 		}
-		if(score > 21){score =0;}
 	}
-	return score;
+	return (score <= 21) ? score : 0;
 }
 
 //Loads all the required images into array
