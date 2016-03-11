@@ -1,0 +1,404 @@
+<html>
+<head>
+<title>Zeggie's Blackjack</title>
+<h1>BlackJack 2.0a1</h1>
+
+<canvas id="myCanvas" width="1500" height="900" style="border:1px solid #000000;">you have a shit browser</canvas>
+<h2>Notes</h2>
+
+No longer loading ~10MB of images :)<br>
+Dealer hits on 16<br>
+Blackjack pays 3to2</br>
+Am fan, Is tribute<br>
+Mobile performance(my phone at least) is poor<br>
+
+
+<script>
+//Blackjack 2.0 (Now with graphics)
+//
+//az23
+"use strict"; 
+var done = true;
+var im;
+var player={x:600,y:550,cards:[],bank:1000,bet:10};
+var dealer={x:600,y:10,cards:[]};
+var deck={x:100,y:50,cards:[]};
+
+var buttons =[];
+buttons.push({x:10,y:520,w:150,h:150,enabled:true,click:hit,text:"hit"});
+buttons.push({x:170,y:520,w:150,h:150,enabled:true,click:stick,text:"stick"});
+buttons.push({x:10,y:420,w:310,h:90,enabled:true,click:deal,text:"deal"});
+buttons.push({x:50,y:820,w:60,h:50,enabled:true,click:betDown,text:"-"});
+buttons.push({x:150,y:820,w:60,h:50,enabled:true,click:betUp,text:"+"});
+
+var toLoad =0;
+var loaded =0;
+ 
+var c = document.getElementById("myCanvas");
+c.addEventListener("mousedown",handleMouse);
+var ctx = c.getContext("2d");
+document.onLoad= loadIm();
+
+function handleMouse(event){
+	console.log("Mouse event");
+	event.preventDefault();
+	let box = c.getBoundingClientRect();
+	let mouseX = Math.floor(event.clientX - box.left);
+	let mouseY = Math.floor(event.clientY - box.top);
+	console.log("MouseX | MouseY");
+	console.log(mouseX + " | " +mouseY);
+	for(let i=0; i<buttons.length; i++){
+		if(buttons[i].enabled){
+			if(mouseX >= buttons[i].x && mouseX <= buttons[i].x + buttons[i].w && mouseY >= buttons[i].y && mouseY <= buttons[i].y + buttons[i].h){
+				console.log("Button "+ i +" pressed");
+				buttons[i].click();
+			}
+		}
+	}
+}
+
+//Generate a new random deck
+function shuffle(){
+	deck.cards.length = 0; //toss the cards left over
+	let t = 1;
+	let l =[];
+	while(deck.cards.length < 52){
+		t = Math.floor(Math.random()*52);
+		if(l.indexOf(t) == -1){
+			l.push(t);
+			deck.cards.push({x:0, y:0, w:342, h:510, card:t, hidden:true});
+		}
+	}	
+}
+
+//Returns score of given hand if >21 returns 0
+function scoreHand(hand){
+	let score =0;
+	let aces = 0;
+	for(let i=0; i<hand.cards.length; i++){
+		let rank = (hand.cards[i].card%13) +1;
+		if(rank > 10){rank=10;}
+		if(rank ==1){
+			aces++;
+			rank = 11;
+		}
+		score += rank;
+	}
+
+	if(score>21){
+		if(aces==0){score = 0;}
+		while(aces>0&&score>21){
+			aces--;
+			score -=10;
+		}
+		if(score > 21){score =0;}
+	}
+	return score;
+}
+
+//Loads all the required images into array
+function loadIm(){
+	let path = "im/blackjack/";
+	let ext = ".png";
+	let bg = ["back","front","bg","button"];
+	let suits = ["spade","club","diam","heart"];
+	let aces = ["aSpade","aClub","aDiam","aHeart"];
+	let jacks =["jSpade","jClub","jDiam","jHeart"];
+	let queens = ["qSpade","qClub","qDiam","qHeart"];
+	let kings = ["kSpade","kClub","kDiam","kHeart"];
+	let num = ["numBlk","numRed"];
+	im = [bg,suits,aces,jacks,queens,kings,num];
+	for(let i=0; i < im.length;i++){
+		for(let j=0; j < im[i].length;j++){
+			let url = path + im[i][j] + ext;
+			im[i][j] = new Image();
+			im[i][j].src = url;
+			toLoad ++;
+			im[i][j].onload = function(){
+								loaded ++;
+								if(loaded == toLoad){
+									shuffle();
+								draw();
+								}
+							}; 
+		}	
+	}	
+}
+
+//***Functions to be called by the the click handler***
+
+//new game
+function deal(){
+	done = false;
+	buttons[2].enabled=false;
+	buttons[3].enabled=false;
+	buttons[4].enabled=false;
+	if(player.bank>player.bet){
+		player.bank -= player.bet;
+		player.cards.length=0;
+		dealer.cards.length=0;
+		if(deck.cards.length<10){
+			shuffle();
+		}
+		draw();
+		dealCard(player,true);
+		setTimeout(dealCard,1000,dealer,true);
+		setTimeout(dealCard,2000,player,true);
+		setTimeout(dealCard,3000, dealer,false);
+	}
+	else{
+		alert("Sir, I'm going to have to ask you to leave");
+	}
+}
+//reduce bet
+function betDown(){
+	if(player.bet >10){
+		player.bet -= 10;
+		draw();
+	}
+	else{
+		alert("No Cash, No Cards");
+	}
+}
+//increase bet
+function betUp(){
+	if(player.bank > player.bet+10){
+		player.bet += 10;
+		draw();
+	}
+	else{
+		alert("In your dreams, get a job");
+	}
+}
+
+function hit(){
+	if(scoreHand(player)>0 && scoreHand(player)<21){
+		dealCard(player,true);
+	}
+}
+
+function stick(){
+	buttons[0].enabled = false;
+	buttons[1].enabled = false;
+	flip(dealer.cards[1]);
+	setTimeout(dealerTurn,1000)
+}
+
+function dealerTurn(){
+	done = true;
+	let d = scoreHand(dealer);
+	let p = scoreHand(player);
+	console.log("p = "+p +" d = "+d);
+	if(d<17 && d>0){
+		dealCard(dealer,true);
+		setTimeout(dealerTurn,1000);
+	}
+	else{
+		if(p >= d){
+			player.bank += player.bet;
+		}
+		if(p > d){
+			player.bank += player.bet;
+			if(p == 21 && player.cards.length == 2){
+				player.bank += player.bet/2;
+			}
+		}
+		alert("p = "+p +" d = "+d);
+			
+			buttons[2].enabled=true;
+			buttons[3].enabled=true;
+			buttons[4].enabled=true;
+		draw();
+	}
+	
+}
+
+function dealCard(dest,reveal){
+	dest.cards.push(deck.cards.pop());
+	if(reveal){
+		flip(dest.cards[dest.cards.length-1],false);
+	}
+	draw();
+}
+
+//***Drawing functions***
+
+//Main drawing function, call for redraw
+function draw(){
+	ctx.save();	
+	if (player.cards.length<2 || done){
+		buttons[0].enabled = false;
+		buttons[1].enabled = false;
+	}
+	else{
+		buttons[0].enabled = true;
+		buttons[1].enabled = true;
+	}
+	if (scoreHand(player)==0 || scoreHand(player) == 21){
+		buttons[0].enabled = false;
+	}
+	else{
+		
+	}
+	ctx.drawImage(im[0][2],0,0);
+	drawStatus();
+	drawHand(dealer);
+	drawHand(player);
+	drawDeck();
+	drawButtons();
+	if(typeof aircard === 'object'){
+		drawCard(aircard.x,aircard.y,342,510,-1);
+	}
+	ctx.restore() 
+}
+
+function drawButtons(){
+	ctx.save();
+	for(let i=0;i<buttons.length; i++){
+		ctx.drawImage(im[0][3],buttons[i].x,buttons[i].y,buttons[i].w,buttons[i].h);
+		ctx.fillStyle ="#777700";
+		ctx.font = "50px Helvetica";
+		if(buttons[i].enabled){
+			ctx.fillText(buttons[i].text,buttons[i].x+25,buttons[i].y+50);
+		}
+	}
+	ctx.restore();
+}
+
+function drawStatus(){
+	ctx.save();
+	ctx.translate(25,750);
+	ctx.font = "50px Helvetica";
+	ctx.fillStyle ="#ffffff";
+	ctx.fillText("Bank \u00A3"+player.bank,0,0);	//pound sign.
+	ctx.fillText("Bet \u00A3" +player.bet,0,50);
+	ctx.restore();
+}
+//Draw all the cards in given hand
+//With overlap like you would
+function drawHand(hand){
+	ctx.save();
+	ctx.translate(hand.x,hand.y);
+	for(let i=0; i<hand.cards.length;i++){
+		ctx.translate(60,0);
+		let t = hand.cards[i];
+		if(t.hidden){
+			drawCard(t.x,t.y,t.w,t.h,-1);
+		}
+		else{
+			drawCard(t.x,t.y,t.w,t.h,t.card);
+		}
+	}
+	ctx.restore();
+}
+//Draw the deck
+function drawDeck(){
+	ctx.save();
+	ctx.translate(deck.x,deck.y);
+	for(let i=1;i<deck.cards.length;i++){
+		ctx.translate(0,-0.5);
+		drawCard(deck.cards[i].x,deck.cards[i].y,deck.cards[i].w,deck.cards[i].h,-1);
+	}
+	ctx.restore();
+}
+//Draw a card to the canvas
+function drawCard(x,y,w,h,card){
+	//Used to split numbers from image
+	let numPos =[0,38,68,100,136,170,204,236,272,306,353,373,417,455];
+
+	//Where to draw symbols for each of the number cards
+	let symbPos =[
+				[[293,295],[293,609]],
+				[[293,295],[293,452],[293,609]],
+				[[162,295],[406,295],[162,609],[406,609]],
+				[[162,295],[406,295],[162,609],[406,609],[290,452]],
+				[[162,295],[406,295],[162,452],[406,452],[162,609],[406,609]],
+				[[162,295],[406,295],[162,452],[406,452],[162,609],[406,609],[285,452]],
+				[[162,295],[406,295],[162,452],[406,452],[162,609],[406,609],[285,373],[285,530]],
+				[[162,295],[162,452],[162,609],[285,295],[285,452],[285,609],[406,295],[406,452],[406,609]],
+				[[162,295],[406,295],[162,452],[406,452],[162,609],[406,609],[285,373],[285,530],[285,217],[285,686]],
+			];
+	ctx.save();
+	ctx.translate(x,y);
+	ctx.scale(w/683,h/1020); 
+	ctx.scale(0.7,0.7);
+	ctx.scale(2,2);
+	ctx.drawImage(im[0][1],0,0);
+	ctx.scale(0.5,0.5);
+	var rank = card%13;
+	var suit = Math.floor(card/13);
+	if(rank>0&&rank<10){
+		for(let i=0;i < symbPos[rank-1].length; i++){
+			ctx.drawImage(im[1][suit],symbPos[rank-1][i][0],symbPos[rank-1][i][1]);
+		}
+	
+	}
+	if (card<0){
+		ctx.scale(2,2);
+		ctx.drawImage(im[0][0],0,0);
+		ctx.restore();
+		return true;
+	}
+	if(rank == 0){ //ace
+		ctx.scale(2,2);
+		ctx.drawImage(im[2][suit],0,0);
+		ctx.scale(0.5,0.5);
+		}
+	
+	if (rank>=10 && rank <=12){
+		ctx.scale(2,2);
+		ctx.drawImage(im[rank-7][suit],0,0);
+		ctx.scale(0.5,0.5);
+	}
+	
+	ctx.drawImage(im[1][suit],25,25);
+	ctx.drawImage(im[1][suit],529,25);
+		let num = 0;
+	if(suit>1){ // red or black
+		num = 1;
+	}
+	ctx.drawImage(im[6][num],numPos[rank],0,(numPos[rank+1]-numPos[rank]),57,70,160,(numPos[rank+1]-numPos[rank]),80);
+	ctx.drawImage(im[6][num],numPos[rank],0,(numPos[rank+1]-numPos[rank]),57,572,160,(numPos[rank+1]-numPos[rank]),80);
+	ctx.translate(64,64);
+	ctx.rotate(Math.PI); //coordinate system is now ass-backward
+	ctx.translate(-64,-64);
+	ctx.drawImage(im[6][num],numPos[rank],0,(numPos[rank+1]-numPos[rank]),57,20,-735,(numPos[rank+1]-numPos[rank]),80);
+	ctx.drawImage(im[6][num],numPos[rank],0,(numPos[rank+1]-numPos[rank]),57,-480,-735,(numPos[rank+1]-numPos[rank]),80);
+	ctx.drawImage(im[1][suit],-25,-870);
+	ctx.drawImage(im[1][suit],-529,-870);
+	
+	ctx.restore();
+}
+//Animation for card turn 
+function flip(card,half){
+	let done = false;
+	let spd = 40; //movement per frame
+	let tim = 40; //time between frames
+	if(half){
+		if(card.w + spd >= 342){
+			card.w = 342;
+			done = true;
+			card.x = 0;
+		}
+		else{
+			card.w += spd;
+			card.x -= spd/2;
+		}
+	}
+	else{
+		if(card.w < spd){
+			card.w = 0;
+			card.hidden = !card.hidden;
+			half = true;
+		}
+		else{
+			card.w -= spd;
+			card.x += spd / 2;
+		}
+	}
+	draw();
+	if(!done){setTimeout(flip,tim,card,half);}
+}
+
+</script>
+</html>
